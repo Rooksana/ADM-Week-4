@@ -1,0 +1,220 @@
+---
+title: "bookbasket analysis"
+author: "Rooksana Sultana"
+date: "April 11, 2017"
+output: html_document
+---
+```{r}
+getwd()
+setwd("C:/Users/rooksana/Desktop/Assingment 4")
+
+library(arules) 
+bookbaskets <- read.transactions("bookdata.tsv.gz", format="single",  	# Note: 2 
+                                 sep="\t",                    	# Note: 3 
+                                 cols=c("userid", "title"),    	# Note: 4 
+                                 rm.duplicates=T)       	# Note: 5
+
+# Note 1: 
+#   Load the arules package. 
+
+# Note 2: 
+#   Specify the file and the file format. 
+
+# Note 3: 
+#   Specify the column separator (a tab). 
+
+# Note 4: 
+#   Specify the column of transaction IDs and of 
+#   item IDs, respectively. 
+
+# Note 5: 
+#   Tell the function to look for and remove 
+#   duplicate entries (for example, multiple entries 
+#   for “The Hobbit” by the same user). 
+
+# 92,108 book purchases.
+#220,447 user IDs.
+
+head(bookbaskets)
+
+
+inspect(bookbaskets[1:5]) #Examine the first five transactions
+
+basketSizes<-size(bookbaskets) #Calculate number of books purchased by "userID"
+
+
+bookFreq<-itemFrequency(bookbaskets) #Calculate the support for each book title 
+View(bookFreq)
+
+bookCount <- (bookFreq/sum(bookFreq))*sum(basketSizes) 
+#   Get the absolute count of book occurrences. 
+
+
+bookbasket_use<-bookbaskets[basketSizes>1] #Only keep transactions with more than one book purchased. 
+
+bookbasket_use
+```
+####
+#start your code here.
+```{r}
+dim(bookbasket_use)
+
+colnames(bookbasket_use)[1:5]
+
+rownames(bookbasket_use)[1:5]
+
+# Plot distribution to get a better look
+library(ggplot2)                                 
+
+ggplot(data.frame(count=basketSizes)) +geom_density(aes(x=count)) + scale_x_log10()
+```
+
+#Finding the ten most frequent books
+
+#list of 10 most popular books sorted by count: 
+##                 Title:                      Wild Animus
+##                         Number of purchases:                   2502
+##                 Title:                     The Lovely Bones: A Novel
+##                        Number of purchases:                     1295
+##                 Title:                      She's Come Undone
+##                        Number of purchases:                     934
+##                 Title:                      The Da Vinci Code
+##                        Number of purchases:                     905
+##                 Title:                      Harry Potter and the Sorcerer's Stone
+##                        Number of purchases:                     832
+##                 Title:                      The Nanny Diaries: A Novel
+##                        Number of purchases:                     821
+##                 Title:                      A Painted House
+##                        Number of purchases:                     819
+##                 Title:                      Bridget Jones's Diary
+##                        Number of purchases:                     772
+##                 Title:                      The Secret Life of Bees
+##                        Number of purchases:                     762
+##                 Title:                      Divine Secrets of the Ya-Ya Sisterhood: A Novel
+##                        Number of purchases:                     737
+```{r}
+Bookspurchased <- sort(bookCount, decreasing=T)   
+Bookspurchased[1:10]
+
+itemFrequency(bookbasket_use)
+freq_bookbaskets_data_frame <- as.data.frame(itemFrequency(bookbasket_use))
+itemFrequencyPlot(bookbasket_use, topN = 10)
+```
+# Unsupervised methods : Association rules : Mining association rules with the arules package
+#Finding the association rules:
+I have removed the title wild Animus from the dataset and created rules by using apriori, by setting high level of support(0.003) and confidence (0.8) . I have got 25 rules, 3-itemset has 21 rules and 4-itemst has 4 rules. Upon inspecting the bookbasket_noAnnimus data set ,I can say that the top sellers are The Lord of the Ring series and Stephanie Plum Novels followed by Harry Porter Series. All these books are fictional series and revolve aroung a central character. I would recommend keeping fictional items in the display.
+
+Basketrules1-: By using apiori algorithm on Bookbasket_use data ,I have set the parameters to support(0.002) and confidence(0.8) the minlen and maxlen have been set as default. A set of 95 rules were created.3-itemsets has 33 rules, 4-itemsets has 49 rules and 5-itemsets have 13 rules. I can say that Key Triology by Nora Roberts has high association with the previous books by the author. From the rules I can conclude that if a person buys {Nicolae: The Rise of Antichrist, Soul Harvest: The World Takes Sides} he is likely to buy  {Tribulation Force: The Continuing Drama of Those Left Behind}. From the rules I can see that the itemset has a lot of key series and Harry Porter series.
+
+
+
+```{r}
+library(arules)
+apriori(bookbasket_use) 
+
+bookbaskets_noAnimus <- apriori(bookbasket_use, parameter = list(support= 0.003, confidence = 0.8),appearance = list(none = c("Wild Animus"))) ##25 rules, 
+summary(bookbaskets_noAnimus)
+inspect(bookbaskets_noAnimus)
+
+basket_rules1 <- apriori(bookbasket_use, parameter =list(support = 0.002, confidence= 0.85))
+print(basket_rules1)
+summary(basket_rules1)
+inspect(basket_rules1) 
+```
+#Sort by lift and Confidence
+
+I have now sorted my rules by using lift and confidence where lift states how important is the rule. Support show the probability of buying b is more if you have a. For example, if a person buys key  {Key of Light, Key of Valor} => he is likely buy {Key of Knowledge}.
+
+
+```{r}
+measures <- interestMeasure(basket_rules1, measure=c("coverage", "fishersExactTest"), transactions=bookbasket_use)                 
+inspect(head((sort(basket_rules1, by="confidence")), n=5))
+
+
+
+br_sorted<-sort(basket_rules1, by = "lift")
+print(br_sorted)
+inspect(br_sorted)
+
+
+#sort by lift and confidence
+br_sorted<- sort(basket_rules1, by = c("lift", "confidence"))
+print(br_sorted)
+inspect(br_sorted)
+
+#creating a csv with our set of rules by lift n confidence to a file-basketrules
+write(br_sorted, file = "C:/Users/rooksana/Desktop/Assingment 4/basket_rules.csv", sep = ",", quote = TRUE, row.names = FALSE)
+
+basket_rules_df <- as(br_sorted, "data.frame")
+View(basket_rules_df)
+
+```
+#Data Visualisation
+## Scatterplot
+In the scatter plot the rules are plotted using support and confidence. This shows us the importance of the rule the darker the color the the lift is high. The rules with high level of support 0.003 and confidence 0.85 happen more frequently. 
+
+By creating a graph based on itemset i can say that a person who buys Four to score book will also buy A Hot Six:Stephane Plum Novel:Three to get deadly followed by High Five book.
+```{r}
+
+library(arulesViz)
+plot(basket_rules1)
+
+#Two Key PLot
+
+plot(basket_rules1, shading="order", control=list(main="Two-key plot"))
+
+# Graph Based Visualizations
+
+plot(br_sorted[1:5], method="graph")
+
+#by using itemset
+plot(basket_rules1[1:10], method="graph", control=list(type="itemsets"))
+
+
+plot(basket_rules1, interactive=TRUE)
+plot(basket_rules1, method="grouped", interactive=TRUE)
+```
+#Books to be displayed to appeal to readers who belong to book clubs
+These are the most popular books which I have come across after doing some research. The display should contain books of fiction genre "Bridget Jones's Diary", Thriller books such as "A Painted House" and Novels such as "The Nanny Diaries".
+```{r}
+
+BOOKS.APRIORI = apriori(bookbasket_use,
+                        parameter = list(
+                          support = 0.0012,
+                          confidence = 0.75,
+                          minlen = 2,
+                          maxlen = 10
+                        ),
+                        appearance = list(
+                          lhs = c("The Lovely Bones: A Novel",
+                                  "She's Come Undone",
+                                  "The Nanny Diaries: A Novel",
+                                  "A Painted House",
+                                  "Bridget Jones's Diary",
+                                  "Divine Secrets of the Ya-Ya Sisterhood: A Novel",
+                                  "The Secret Life of Bees",
+                                  "White Oleander : A Novel",
+                                  "The Deep End of the Ocean",
+                                  "Where The Heart Is",
+                                  "House of Sand and Fog",
+                                  "East of Eden","The Green Mile: Night Journey","The Green Mile: Coffey on the Mile" )))
+                        
+
+inspect(BOOKS.APRIORI[1:15])
+```
+#Recommendations:other books that he should include in display cases
+By looking at the rules from basket_rule1, I would recommend the following books:
+Nicolae: The Rise of Antichrist
+Soul Harvest
+The World Takes Sides
+The Nanny Diaries
+
+
+
+
+
+
+
+
+
+
